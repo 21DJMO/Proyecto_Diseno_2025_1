@@ -1,1 +1,1 @@
-Carpeta con las figuras del informe
+#Carpeta con las figuras del informe
