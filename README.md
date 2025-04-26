@@ -1,4 +1,4 @@
-# Proyecto_Diseno_2025_1
+# Proyecto_Diseño_2025_1
 Creado por:
 - Didier Julian Moreno Ortiz
 - Johan Sebastián Quitian Valderrama
