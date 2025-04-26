@@ -1,4 +1,4 @@
-# Proyecto_Diseño_2025_1
+# MQ CURRENT
 Creado por:
 - Didier Julian Moreno Ortiz
 - Johan Sebastián Quitian Valderrama
