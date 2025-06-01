@@ -17,17 +17,19 @@ MISO = Pin(11, Pin.IN)  # Data output del ADC
 SDI = Pin(12, Pin.OUT)  
 SDI.value(0)# SDI valor en alto para mayor resolución, menor ruido y mejor calidad de la señal medida por el ADC
 
-ScaleControl = Pin(13,Pin.OUT)#Señal que controla el cambio de las resistencias de shunt , controla Q2 y en consecuencia Q1  
-ScaleControl.value(1)# 0 para escala de mA y 1 para escala de uA
+Mcontrol = Pin(13,Pin.OUT)#Señal activa en bajo que controla la activacion del mosfet Q1
+Ucontrol = Pin(14,Pin.OUT)#Señal activa en bajo que controla la activacion del mosfet Q2
+Mcontrol.value(1)#Iniciamos en la scala de uA
+Ucontrol.value(0)
 unidad = "[uA]"
 
-VREF = 1.99998 # Voltaje de referencia del ADC
+VREF = 2 # Voltaje de referencia del ADC
 
-offset=0.999031# Voltaje de Offset el que proviene del divisor junto al propio de los opamps
-Ganancia=(1.28256-offset)/0.000567058##Ganancia de la etapa de amplificacion
+offset=1.13966 # Voltaje de Offset el que proviene del divisor junto al propio de los opamps
+Ganancia=(0.14996-offset)/(0.0001)##Ganancia de la etapa de amplificacion
 
-RuA=(9.99469/10**5)/(9.99981/10**6)
-RmA=1/(1/(8/10**3+8.75666/(0.0599365*10**5))+1/RuA) ## El paralelo entre la resistencia de 8m+la del mosfet 1.4609m y la de RuA1
+RuA=10
+RmA=10/10**3	## El paralelo entre la resistencia de 8m+la del mosfet 1.4609m y la de RuA1
 FactormA=10**3/(Ganancia*RmA)#Factor para convertir el voltaje medido en corriente cuando se utilizan corrientes positivas y escala de mA
 FactoruA=10**6/(Ganancia*RuA)#Factor para convertir el voltaje medido en corriente cuando se utilizan corrientes positivas y escala de uA
 time.sleep_ms(100)
@@ -40,13 +42,14 @@ startTime=time.ticks_us()
 bajo_count = 0
 
 while True:
+    time.sleep_ms(100)
     cs.value(1)
     if Busy.value() == 0:
         cs.value(0)
         Data = soft_spi_read()
-        Voltaje = ((Data >> 5) & 0xFFFFFF) / (2 ** 24) * VREF
-        Voltaje=Voltaje-offset
-        Corriente = Voltaje*FactormA if ScaleControl.value()==0 else Voltaje*FactoruA
+        Voltaje1 = ((Data >> 5) & 0xFFFFFF) / (2 ** 24) * VREF
+        Voltaje=Voltaje1-offset
+        Corriente = Voltaje*FactormA if Mcontrol.value()==0 else Voltaje*FactoruA
 
         # Cálculo de integrales
         delta_t = (time.ticks_us() - prev_time) / 1000000  # en segundos
@@ -60,23 +63,25 @@ while True:
         CorrienteRms = (integralRms / tiempo_total) ** 0.5
         CorrientePromedio = integralPromedio / tiempo_total
 
-        if ScaleControl.value() == 0:  # Estamos en mA
+        if Mcontrol.value() == 0:  # Estamos en mA
             if abs(Corriente) < 0.19:
                 bajo_count += 1
             else:
                 bajo_count = 0
 
-        if ScaleControl.value() == 1 and abs(Voltaje + offset) < 1e-7:# Detección de saturación y cambio de escala
+        if Mcontrol.value() == 1 and abs(Voltaje + offset) < 1e-7:# Detección de saturación y cambio de escala
             print("Cambio a escala mA (saturación)")
-            ScaleControl.value(0)
+            Mcontrol.value(0)
+            Ucontrol.value(1)
             unidad = "[mA]"
             integralPromedio = integralRms = 0
             prev_value = prev_time = 0
             startTime = time.ticks_us()
 
-        elif (ScaleControl.value() == 0 and bajo_count>=20):##Si detecto una corriente baja durante mucho tiempo seguido , estoy en una escala incorrecta
+        elif (Mcontrol.value() == 0 and bajo_count>=20):##Si detecto una corriente baja durante mucho tiempo seguido , estoy en una escala incorrecta
             print("Cambio a escala uA (rango bajo)")
-            ScaleControl.value(1)
+            Mcontrol.value(1)
+            Ucontrol.value(0)
             unidad = "[uA]"
             integralPromedio = integralRms = 0
             prev_value = prev_time = 0
@@ -85,3 +90,4 @@ while True:
         else:
             print(f"Corriente: {Corriente:.4f} {unidad}")
             print(f"RMS: {CorrienteRms:.4f} {unidad} | Promedio: {CorrientePromedio:.4f} {unidad}\n")
+
